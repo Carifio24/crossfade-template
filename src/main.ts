@@ -12,11 +12,13 @@ import { WWTComponent, wwtPinia } from "@wwtelescope/engine-pinia";
 import { library } from "@fortawesome/fontawesome-svg-core";
 import {
   faBookOpen,
+  faRedo,
   faTimes,
   faVideo,
 } from "@fortawesome/free-solid-svg-icons";
 
 library.add(faBookOpen);
+library.add(faRedo);
 library.add(faTimes);
 library.add(faVideo);
 
@@ -25,7 +27,22 @@ library.add(faVideo);
 const update = (el: HTMLElement, binding: Vue.DirectiveBinding) => el.style.visibility = (binding.value) ? "hidden" : "";
 
 createApp(CrossfadeTemplate, {
-  wwtNamespace: "crossfade-template"
+  wwtNamespace: "crossfade-template",
+  accentColor: "#F0AB52",
+
+  // Here replace the URLs for image 1 and 2
+  // You can also rename the layers
+  wtml: {
+    image1: "https://web.wwtassets.org/specials/2023/cosmicds-carina/collection/jwst_carina.wtml",
+    image2: "https://web.wwtassets.org/specials/2023/cosmicds-carina/collection/carina_nebula.wtml",
+  },
+
+  // You should put in your own URLs/background name here
+  // The story will automatically update
+  url: "https://web.wwtassets.org/specials/2023/cosmicds-carina/",
+  thumbnailUrl: "https://cdn.worldwidetelescope.org/thumbnails/jwst.jpg",
+  backgroundWtml: "https://data1.wwtassets.org/packages/2022/07_jwst/smacs0723/jwst_smacs0723.wtml",
+  backgroundName: "unwise"
 })
  
   // Plugins

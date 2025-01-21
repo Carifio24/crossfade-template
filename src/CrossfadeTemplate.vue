@@ -79,6 +79,23 @@
         </icon-button>
       </div>
       <div id="center-buttons">
+        <button
+          id="show-layers-button"
+          class="ui-text"
+          @click="showLayers = !showLayers"
+        >
+          {{ showLayers ? "Hide Images" : "Show Images" }}
+        </button>
+        <icon-button
+          id="reset-icon"
+          fa-icon="redo"
+          :color="accentColor"
+          @activate="() => resetView(false)"
+          tooltip-text="Return to Starting Location"
+          tooltip-location="bottom"
+          tooltip-offset="3px"
+          :show-tooltip="!mobile"
+        ></icon-button>
       </div>
       <div id="right-buttons">
       </div>
@@ -88,6 +105,41 @@
     <!-- This block contains the elements (e.g. the project icons) displayed along the bottom of the screen -->
 
     <div id="bottom-content">
+      <div id="tools" v-if="showLayers">
+        <div class="tool-container">
+          <template v-if="currentTool == 'crossfade'">
+            <span
+              class="ui-text slider-label"
+              @click="crossfadeOpacity = 0"
+              @keyup.enter="crossfadeOpacity = 0"
+              tabindex="0"
+              >Image 1</span>
+            <input
+              class="opacity-range"
+              type="range"
+              v-model="crossfadeOpacity"
+            />
+            <span
+              class="ui-text slider-label"
+              @click="crossfadeOpacity = 100"
+              @keyup.enter="crossfadeOpacity = 100"
+              tabindex="0"
+              >Image 2</span>
+          </template>
+          <template v-else-if="currentTool == 'choose-background'">
+            <span>Background imagery:</span>
+            <select v-model="curBackgroundImagesetName">
+              <option
+                v-for="bg in backgroundImagesets"
+                v-bind:value="bg.imagesetName"
+                v-bind:key="bg.imagesetName"
+              >
+                {{ bg.displayName }}
+              </option>
+            </select>
+          </template>
+        </div>
+      </div>
       <div id="body-logos" v-if= "!smallSize">
         <credit-logos/>
       </div>
@@ -237,18 +289,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, nextTick } from "vue";
+import { ref, reactive, computed, onMounted, nextTick, watch } from "vue";
 import { ImageSetLayer, Place } from "@wwtelescope/engine";
 import { applyImageSetLayerSetting } from "@wwtelescope/engine-helpers";
 import { GotoRADecZoomParams, engineStore } from "@wwtelescope/engine-pinia";
 import { BackgroundImageset, skyBackgroundImagesets, supportsTouchscreen, blurActiveElement, useWWTKeyboardControls } from "@cosmicds/vue-toolkit";
 import { useDisplay } from "vuetify";
 
+type ToolType = "crossfade" | "choose-background" | null;
 type SheetType = "text" | "video";
 type CameraParams = Omit<GotoRADecZoomParams, "instant">;
 export interface CrossfadeTemplateProps {
   wwtNamespace?: string;
   initialCameraParams?: CameraParams;
+  accentColor?: string;
   wtml: Record<string, string>;
   url: string;
   thumbnailUrl: string;
@@ -262,9 +316,19 @@ useWWTKeyboardControls(store);
 
 const touchscreen = supportsTouchscreen();
 const { smAndDown } = useDisplay();
+const mobile = computed(() => touchscreen && smAndDown.value);
+const curBackgroundImagesetName = computed<string>({
+  get() {
+    return store.backgroundImageset?.get_name() ?? "";
+  },
+  set(name: string) {
+    store.setBackgroundImageByName(name);
+  }
+});
 
 const props = withDefaults(defineProps<CrossfadeTemplateProps>(), {
   wwtNamespace: "crossfade-template",
+  accentColor: "#FFFFFF",
   initialCameraParams: () => {
     return {
       raRad: 0,
@@ -287,6 +351,7 @@ const tab = ref(0);
 const layers = {} as Record<string, ImageSetLayer>;
 const crossfadeOpacity = ref(50);
 const showLayers = ref(true);
+const currentTool = ref<ToolType>("crossfade");
 
 onMounted(() => {
   store.waitForReady().then(async () => {
@@ -340,7 +405,7 @@ const smallSize = computed(() => smAndDown);
 /* This lets us inject component data into element CSS */
 const cssVars = computed(() => {
   return {
-    "--accent-color": accentColor.value,
+    "--accent-color": props.accentColor,
     "--app-content-height": showTextSheet.value ? "66%" : "100%",
   };
 });
@@ -399,6 +464,17 @@ function resetView(instant=true) {
     instant
   });
 }
+
+/** Watchers */
+watch(showLayers, show => {
+  Object.values(layers).forEach(layer => {
+    applyImageSetLayerSetting(layer, ["enabled", show]);
+  });
+});
+
+watch(ready, value => {
+  showSplashScreen.value = value;
+});
 </script>
 
 <style lang="less">
@@ -419,9 +495,12 @@ html {
   background-color: #000;
   overflow: hidden;
 
+  ::-webkit-scrollbar {
+    display: none;
+  }
   
   -ms-overflow-style: none;
-  // scrollbar-width: none;
+  scrollbar-width: none;
 }
 
 body {
@@ -516,9 +595,20 @@ body {
   width: calc(100% - 2rem);
   pointer-events: none;
   display: flex;
-  flex-direction: column;
-  justify-content: space-around;
+  flex-direction: row;
+  justify-content: space-between;
   align-items: flex-start;
+
+  #center-buttons {
+    display: flex;
+    flex-direction: row;
+  }
+
+  #right-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
 }
 
 #left-buttons {
@@ -537,6 +627,62 @@ body {
   pointer-events: none;
   align-items: center;
   gap: 5px;
+}
+
+#tools {
+  z-index: 10;
+  color: #fff;
+
+  .opacity-range {
+    width: 50vw;
+  }
+
+  .clickable {
+    cursor: pointer;
+  }
+
+  select {
+    background: white;
+    color: black;
+    border-radius: 3px;
+  }
+}
+
+.tool-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+  pointer-events: auto;
+}
+
+.ui-text {
+  color: var(--accent-color);
+  background: black;
+  padding: 5px 5px;
+  border: 2px solid black;
+  border-radius: 10px;
+  font-size: calc(0.7em + 0.2vw);
+
+  &:focus {
+    color: white;
+  }
+}
+
+.slider-label {
+  font-weight: bold;
+  font-size: calc(0.8em + 0.5vw);
+  padding: 5px 10px;
+  text-align: center;
+  line-height: 20px;
+
+  .light-type {
+    font-size: calc(0.56em + 0.35vw);
+  }
+
+  &:hover {
+    cursor: pointer;
+  }
 }
 
 #splash-overlay {
