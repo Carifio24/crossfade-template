@@ -293,12 +293,13 @@ import { ref, reactive, computed, onMounted, nextTick, watch } from "vue";
 import { ImageSetLayer, Place } from "@wwtelescope/engine";
 import { applyImageSetLayerSetting } from "@wwtelescope/engine-helpers";
 import { GotoRADecZoomParams, engineStore } from "@wwtelescope/engine-pinia";
-import { BackgroundImageset, skyBackgroundImagesets, supportsTouchscreen, blurActiveElement, useWWTKeyboardControls } from "@cosmicds/vue-toolkit";
+import { BackgroundImageset, skyBackgroundImagesets, supportsTouchscreen, blurActiveElement, useWWTKeyboardControls, D2R } from "@cosmicds/vue-toolkit";
 import { useDisplay } from "vuetify";
 
 type ToolType = "crossfade" | "choose-background" | null;
 type SheetType = "text" | "video";
-type CameraParams = Omit<GotoRADecZoomParams, "instant">;
+type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
+type CameraParams = Optional<Omit<GotoRADecZoomParams, "instant">, "raRad" | "decRad">;
 export interface CrossfadeTemplateProps {
   wwtNamespace?: string;
   initialCameraParams?: CameraParams;
@@ -331,9 +332,8 @@ const props = withDefaults(defineProps<CrossfadeTemplateProps>(), {
   accentColor: "#FFFFFF",
   initialCameraParams: () => {
     return {
-      raRad: 0,
-      decRad: 0,
-      zoomDeg: 60
+      zoomDeg: 60,
+      rollRad: 0,
     };
   }
 });
@@ -354,10 +354,6 @@ const currentTool = ref<ToolType>("crossfade");
 onMounted(() => {
   store.waitForReady().then(async () => {
     skyBackgroundImagesets.forEach(iset => backgroundImagesets.push(iset));
-    store.gotoRADecZoom({
-      ...props.initialCameraParams,
-      instant: true
-    }).then(() => positionSet.value = true);
 
     // If there are layers to set up, do that here!
     const layerPromises = Object.entries(props.wtml).map(([name, url]) => {
@@ -380,14 +376,14 @@ onMounted(() => {
       });
     });
 
-    Promise.all(layerPromises).then((layers) => {
-      layers.forEach(layer => {
+    Promise.all(layerPromises).then((results) => {
+      results.forEach(layer => {
         if (layer === null) { return; }
         layers[layer.get_name()] = layer;
         applyImageSetLayerSetting(layer, ["opacity", 0.5]);
       });
       layersLoaded.value = true;
-      resetView();
+      resetView().then(() => positionSet.value = true);
     });
   });
 });
@@ -456,10 +452,28 @@ function selectSheet(sheetType: SheetType | null) {
   }
 }
 
-function resetView(instant=true) {
-  store.gotoRADecZoom({
-    ...props.initialCameraParams,
-    instant
+async function resetView(instant=true): Promise<void> {
+  const ra = props.initialCameraParams.raRad;
+  const dec = props.initialCameraParams.decRad;
+  const zoomDeg = props.initialCameraParams.zoomDeg;
+  if (ra != undefined && dec != undefined) {
+    return store.gotoRADecZoom({
+      raRad: ra,
+      decRad: dec,
+      zoomDeg,
+      instant,
+    });
+  }
+
+  const imageset1 = layers.image1.get_imageSet();
+  const imageset2 = layers.image2.get_imageSet();
+  const raRad = D2R * 0.5 * (imageset1.get_centerX() + imageset2.get_centerX());
+  const decRad = D2R * 0.5 * (imageset1.get_centerY() + imageset2.get_centerY());
+  return store.gotoRADecZoom({
+    raRad,
+    decRad,
+    zoomDeg,
+    instant,
   });
 }
 
