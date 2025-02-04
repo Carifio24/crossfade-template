@@ -64,7 +64,7 @@
         <icon-button
           v-model="showTextSheet"
           fa-icon="book-open"
-          :color="buttonColor"
+          :color="accentColor"
           :tooltip-text="showTextSheet ? 'Hide Info' : 'Learn More'"
           tooltip-location="start"
         >
@@ -72,7 +72,7 @@
         <icon-button
           v-model="showVideoSheet"
           fa-icon="video"
-          :color="buttonColor"
+          :color="accentColor"
           tooltip-text="Watch video"
           tooltip-location="start"
         >
@@ -344,8 +344,6 @@ const backgroundImagesets = reactive<BackgroundImageset[]>([]);
 const sheet = ref<SheetType | null>(null);
 const layersLoaded = ref(false);
 const positionSet = ref(false);
-const accentColor = ref("#ffffff");
-const buttonColor = ref("#ffffff");
 const tab = ref(0);
 
 const layers = {} as Record<string, ImageSetLayer>;
